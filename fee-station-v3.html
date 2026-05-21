@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Top Up Fee Station — Interactive Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Oxanium:wght@400;600&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #EDEEF3;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ── 语言切换 ── */
+.lang-switcher {
+  position: fixed; top: 20px; right: 24px; z-index: 200;
+  display: flex; align-items: center; gap: 0;
+  background: #FFFFFF; border-radius: 6px; border: 1px solid #EDEEF3;
+  overflow: hidden;
+}
+.lang-btn {
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+  cursor: pointer; border: none; background: transparent;
+  color: #73798B; transition: background 0.12s, color 0.12s;
+}
+.lang-btn.active { background: #1F32D6; color: #FFFFFF; }
+.lang-btn:not(.active):hover { background: #F8F9FC; color: #1C1C1C; }
+
+/* ── 余额卡片 ── */
+.balance-card {
+  background: #FFFFFF; border-radius: 10px; padding: 24px; width: 360px;
+}
+.dev-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.dev-name { font-size: 14px; font-weight: 600; color: #1C1C1C; }
+.balance-label { font-size: 12px; font-weight: 500; color: #73798B; margin-bottom: 4px; }
+.balance-amount { font-family: 'Oxanium', sans-serif; font-size: 24px; font-weight: 600; color: #1C1C1C; margin-bottom: 16px; }
+.actions { display: flex; gap: 16px; align-items: center; }
+.action-link {
+  font-size: 14px; font-weight: 500; color: #1F32D6;
+  cursor: pointer; border: none; background: none; padding: 0;
+  font-family: 'Poppins', sans-serif;
+}
+.action-link:hover { color: #131E80; }
+.action-link.highlight {
+  background: rgba(31,50,214,0.1); border-radius: 4px; padding: 3px 10px;
+  font-size: 12px; font-weight: 600; transition: background 0.15s;
+}
+.action-link.highlight:hover { background: rgba(31,50,214,0.18); }
+
+/* ── 遮罩 ── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.overlay.active { display: flex; }
+
+/* ── Dialog ── */
+.dialog {
+  background: #FFFFFF; border-radius: 10px; width: 560px;
+  max-height: 92vh; overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+  animation: dialogIn 0.2s ease;
+}
+@keyframes dialogIn {
+  from { opacity:0; transform: translateY(10px) scale(0.98); }
+  to   { opacity:1; transform: translateY(0) scale(1); }
+}
+.dialog-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 24px 24px 0; margin-bottom: 24px;
+  position: sticky; top: 0; background: #FFFFFF; z-index: 2;
+}
+.dialog-title { font-size: 24px; font-weight: 600; color: #1C1C1C; line-height: 32px; }
+.close-btn {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #73798B; font-size: 16px; border: none; background: none;
+  border-radius: 6px; flex-shrink: 0; transition: background 0.12s;
+}
+.close-btn:hover { background: #EDEEF3; color: #1C1C1C; }
+.dialog-body { padding: 0 24px; display: flex; flex-direction: column; gap: 16px; }
+.dialog-footer {
+  padding: 20px 24px; display: flex; justify-content: flex-end; gap: 12px;
+  border-top: 1px solid #EDEEF3; margin-top: 24px;
+  position: sticky; bottom: 0; background: #FFFFFF; z-index: 2;
+}
+
+/* ── 字段 ── */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 14px; font-weight: 500; color: #1C1C1C; }
+
+/* 源账户只读块 */
+.readonly-block {
+  background: #F8F9FC; border-radius: 6px; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid #EDEEF3;
+}
+.acc-name { font-size: 14px; font-weight: 600; color: #1C1C1C; }
+.acc-bal { font-family: 'Oxanium', sans-serif; font-size: 13px; font-weight: 400; color: #73798B; }
+
+/* ── 自定义 Select ── */
+.custom-select-wrap { position: relative; }
+.custom-select {
+  width: 100%; height: 40px; border: 1px solid #EDEEF3; border-radius: 6px;
+  padding: 0 36px 0 12px; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; background: #FFFFFF; font-size: 14px; color: #1C1C1C;
+  user-select: none; transition: border-color 0.12s; position: relative;
+}
+.custom-select:hover { border-color: #B9BCC5; }
+.custom-select.open { border-color: #1F32D6; border-bottom-left-radius:0; border-bottom-right-radius:0; }
+.custom-select .placeholder { color: #BCBBC1; }
+.select-arrow {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  pointer-events: none; color: #73798B; font-size: 11px; transition: transform 0.15s;
+}
+.custom-select.open .select-arrow { transform: translateY(-50%) rotate(180deg); }
+
+.dropdown {
+  display: none; position: absolute; left:0; right:0; top:100%;
+  border: 1px solid #1F32D6; border-top: none;
+  border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+  background: #FFFFFF; box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  z-index: 20; overflow: hidden; max-height: 240px; overflow-y: auto;
+}
+.dropdown.open { display: block; }
+.dropdown-item {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  font-size: 14px; font-weight: 400; color: #1C1C1C; cursor: pointer;
+  border-bottom: 1px solid #F8F9FC; transition: background 0.1s;
+}
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:hover { background: #F8F9FC; }
+.dropdown-item.selected { background: rgba(31,50,214,0.06); color: #1F32D6; font-weight: 500; }
+.dropdown-group-label {
+  padding: 6px 12px 4px; font-size: 11px; color: #73798B; font-weight: 500;
+  background: #F8F9FC;
+}
+.dropdown-group-label.bordered { border-top: 1px solid #EDEEF3; }
+
+/* 图标圆点 */
+.token-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: #FFFFFF; flex-shrink: 0;
+}
+.dot-usdt { background: #26A17B; }
+.dot-usdc { background: #2775CA; }
+
+/* ── 收款人区块 ── */
+.recipient-block {
+  border: 1px solid #EDEEF3; border-radius: 6px; padding: 12px 16px;
+}
+.recipient-row { display: flex; align-items: flex-start; gap: 12px; }
+.addr-readonly {
+  flex: 1; border: 1px solid #EDEEF3; border-radius: 6px; padding: 8px 12px;
+  font-size: 12px; color: #BCBBC1; background: #F8F9FC;
+  word-break: break-all; line-height: 18px;
+}
+.addr-readonly.filled { color: #73798B; }
+.addr-tag { font-size: 11px; font-weight: 500; color: #73798B; margin-top: 4px; }
+
+/* ── 您将发送区块 ── */
+.send-block {
+  border: 1px solid #EDEEF3; border-radius: 6px; padding: 12px 16px;
+  transition: border-color 0.12s;
+}
+.send-block:focus-within { border-color: #1F32D6; }
+.send-block.disabled { background: #F8F9FC; }
+.send-top-row {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+}
+.send-label { font-size: 12px; font-weight: 500; color: #73798B; }
+.avail-row { display: flex; align-items: center; gap: 6px; }
+.avail-text { font-size: 12px; color: #73798B; }
+.avail-num { font-family: 'Oxanium', sans-serif; font-size: 12px; font-weight: 400; color: #1C1C1C; }
+.max-btn {
+  font-size: 12px; font-weight: 600; color: #1F32D6;
+  border: none; background: none; cursor: pointer; padding: 0;
+  font-family: 'Poppins', sans-serif;
+}
+.max-btn:hover { color: #131E80; }
+.max-btn:disabled { color: #B9BCC5; cursor: not-allowed; }
+.amount-big {
+  font-family: 'Oxanium', sans-serif;
+  font-size: 28px; font-weight: 600; color: #1C1C1C;
+  border: none; outline: none; background: transparent; width: 100%; margin-bottom: 12px;
+}
+.amount-big::placeholder { color: #BCBBC1; font-size: 20px; font-weight: 400; }
+.amount-big:disabled { cursor: not-allowed; color: #B9BCC5; }
+
+.detail-expand {
+  border-top: 1px solid #EDEEF3; padding-top: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.detail-col-heads {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  font-size: 12px; font-weight: 500; color: #73798B; padding-bottom: 4px;
+}
+.detail-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: center; }
+.detail-coin { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #1C1C1C; }
+.detail-coin-sub { font-size: 11px; color: #73798B; font-weight: 400; }
+.detail-input {
+  font-family: 'Oxanium', sans-serif; font-size: 14px; font-weight: 600; color: #73798B;
+  border: 1px solid #EDEEF3; border-radius: 6px; padding: 6px 10px;
+  background: #F8F9FC; outline: none; width: 100%;
+}
+
+/* ── 总计区块 ── */
+.total-block {
+  border: 1px solid #EDEEF3; border-radius: 6px; padding: 16px;
+  background: #F8F9FC; display: flex; flex-direction: column; gap: 12px;
+}
+.total-title { font-size: 14px; font-weight: 600; color: #1C1C1C; }
+.total-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.total-key { font-size: 14px; font-weight: 400; color: #73798B; display: flex; align-items: center; gap: 4px; }
+.total-val { display: flex; align-items: center; gap: 6px; }
+.total-amount { font-family: 'Oxanium', sans-serif; font-size: 14px; font-weight: 600; color: #1C1C1C; }
+.fee-amount  { font-family: 'Oxanium', sans-serif; font-size: 14px; font-weight: 600; color: #1C1C1C; }
+.chain-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+  background: #EFF8FF; color: #175CD3;
+}
+.help-icon {
+  width: 14px; height: 14px; border-radius: 50%; background: #EDEEF3; color: #73798B;
+  font-size: 9px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+  cursor: help; flex-shrink: 0;
+}
+.fee-detail-toggle {
+  font-size: 12px; font-weight: 600; color: #1F32D6;
+  cursor: pointer; border: none; background: none; padding: 0;
+  font-family: 'Poppins', sans-serif; align-self: flex-end;
+}
+.fee-detail-toggle:hover { color: #131E80; }
+.fee-detail-table { border-top: 1px solid #EDEEF3; padding-top: 12px; }
+.fee-detail-head {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  font-size: 11px; font-weight: 500; color: #73798B;
+  padding-bottom: 8px; border-bottom: 1px solid #EDEEF3; margin-bottom: 8px;
+}
+.fee-detail-row { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; }
+.fee-coin-cell { display: flex; align-items: center; gap: 6px; }
+.fee-num-cell { font-family: 'Oxanium', sans-serif; font-size: 12px; color: #73798B; }
+
+/* ── 提示栏 ── */
+.notice-bar {
+  display: flex; align-items: flex-start; gap: 8px; padding: 12px;
+  background: #FFF8F0; border: 1px solid #FEDF89; border-radius: 6px;
+  font-size: 12px; color: #B54708; line-height: 18px;
+}
+.notice-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── 按钮 ── */
+.btn {
+  height: 40px; padding: 0 24px; border-radius: 6px; border: none; cursor: pointer;
+  font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.12s; white-space: nowrap;
+}
+.btn-tertiary { background: #EDEEF3; color: #1C1C1C; }
+.btn-tertiary:hover { background: #E3E4EC; }
+.btn-primary { background: #1F32D6; color: #FFFFFF; }
+.btn-primary:hover { background: #131E80; }
+.btn-primary:disabled { background: #B9BCC5; cursor: not-allowed; }
+
+/* ── 预览 Summary ── */
+.summary-table { border: 1px solid #EDEEF3; border-radius: 10px; overflow: hidden; }
+.summary-row {
+  display: flex; align-items: flex-start; padding: 14px 16px;
+  border-bottom: 1px solid #F8F9FC;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-key { font-size: 14px; font-weight: 400; color: #73798B; width: 120px; flex-shrink: 0; padding-top: 2px; }
+.summary-val { font-size: 14px; font-weight: 500; color: #1C1C1C; flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.summary-val.mono { font-family: 'Oxanium', sans-serif; font-size: 14px; font-weight: 600; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  background: #1C1C1C; color: #FFFFFF; padding: 12px 20px; border-radius: 6px;
+  font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none;
+  transition: opacity 0.2s; z-index: 999; white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+</style>
+</head>
+<body>
+
+<!-- 语言切换 -->
+<div class="lang-switcher">
+  <button class="lang-btn active" id="btnZh">中文</button>
+  <button class="lang-btn" id="btnEn">EN</button>
+</div>
+
+<!-- 余额卡片 -->
+<div>
+  <div class="balance-card">
+    <div class="dev-row">
+      <span class="dev-name" data-i18n="developer">开发者</span>
+      <span style="color:#73798B;font-size:18px;">→</span>
+    </div>
+    <p class="balance-label" data-i18n="balance">余额</p>
+    <p class="balance-amount">$677.87</p>
+    <div class="actions">
+      <button class="action-link" data-i18n="withdraw">出金</button>
+      <button class="action-link" data-i18n="transfer">划转</button>
+      <button class="action-link highlight" id="openBtn" data-i18n="topupFeeStation">充值 Fee Station</button>
+    </div>
+  </div>
+</div>
+
+<!-- 遮罩 -->
+<div class="overlay" id="overlay">
+
+  <!-- ════ Dialog 1: 表单 ════ -->
+  <div class="dialog" id="dialogForm">
+    <div class="dialog-header">
+      <h1 class="dialog-title" data-i18n="topupFeeStation">充值 Fee Station</h1>
+      <button class="close-btn" id="closeForm">✕</button>
+    </div>
+    <div class="dialog-body">
+
+      <!-- 源账户 -->
+      <div class="field">
+        <label class="field-label" data-i18n="sourceAccount">源账户</label>
+        <div class="readonly-block">
+          <span class="acc-name" data-i18n="developer">开发者</span>
+          <span class="acc-bal" id="availDisplay">可用 677.87 USDT</span>
+        </div>
+      </div>
+
+      <!-- 收款人 -->
+      <div class="field">
+        <label class="field-label" data-i18n="recipient">收款人</label>
+        <div class="recipient-block">
+          <div class="recipient-row">
+            <!-- 代币+网络选择 -->
+            <div class="custom-select-wrap" style="min-width:160px;flex-shrink:0;">
+              <div class="custom-select" id="coinSelect" style="height:52px;flex-direction:column;align-items:flex-start;justify-content:center;padding:6px 36px 6px 10px;gap:2px;">
+                <span id="coinSelectDisplay"><span class="placeholder" data-i18n="selectToken">选择代币</span></span>
+                <span class="select-arrow">▾</span>
+              </div>
+              <div class="dropdown" id="coinDropdown">
+                <div class="dropdown-group-label">USDT</div>
+                <div class="dropdown-item" data-token="USDT" data-net="Tron"           data-addr="TXYZabcFeeStation1234USDT5678TRON90AB">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Tron</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="Ethereum"       data-addr="0xFeeStation1a2b3c4d5e6f7890abcdef1234">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Ethereum</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="Solana"         data-addr="FeeStationSoLAna11111111111111111111111">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Solana</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="Polygon"        data-addr="0xFeeStation1a2b3c4d5e6f7890abcdef5678">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Polygon</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="Avalanche C"    data-addr="0xFeeStation1a2b3c4d5e6f7890abcdef9012">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Avalanche C</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="Optimism"       data-addr="0xFeeStation1a2b3c4d5e6f7890abcdefABCD">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Optimism</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="Arbitrum"       data-addr="0xFeeStation1a2b3c4d5e6f7890abcdefEF01">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">Arbitrum</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDT" data-net="BNB Smart Chain" data-addr="0xFeeStation1a2b3c4d5e6f7890abcdef2345">
+                  <div class="token-dot dot-usdt" style="width:20px;height:20px;font-size:9px;">T</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDT</div><div style="font-size:11px;color:#73798B;">BNB Smart Chain</div></div>
+                </div>
+                <div class="dropdown-group-label bordered">USDC</div>
+                <div class="dropdown-item" data-token="USDC" data-net="Ethereum"       data-addr="0xFeeStationUSDC1a2b3c4d5e6f789012">
+                  <div class="token-dot dot-usdc" style="width:20px;height:20px;font-size:9px;">U</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDC</div><div style="font-size:11px;color:#73798B;">Ethereum</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDC" data-net="Solana"         data-addr="FeeStationUSDCSoLAna1111111111111111">
+                  <div class="token-dot dot-usdc" style="width:20px;height:20px;font-size:9px;">U</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDC</div><div style="font-size:11px;color:#73798B;">Solana</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDC" data-net="Polygon"        data-addr="0xFeeStationUSDC1a2b3c4d5e6f789034">
+                  <div class="token-dot dot-usdc" style="width:20px;height:20px;font-size:9px;">U</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDC</div><div style="font-size:11px;color:#73798B;">Polygon</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDC" data-net="Avalanche C"    data-addr="0xFeeStationUSDC1a2b3c4d5e6f789056">
+                  <div class="token-dot dot-usdc" style="width:20px;height:20px;font-size:9px;">U</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDC</div><div style="font-size:11px;color:#73798B;">Avalanche C</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDC" data-net="Optimism"       data-addr="0xFeeStationUSDC1a2b3c4d5e6f789078">
+                  <div class="token-dot dot-usdc" style="width:20px;height:20px;font-size:9px;">U</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDC</div><div style="font-size:11px;color:#73798B;">Optimism</div></div>
+                </div>
+                <div class="dropdown-item" data-token="USDC" data-net="Arbitrum"       data-addr="0xFeeStationUSDC1a2b3c4d5e6f789090">
+                  <div class="token-dot dot-usdc" style="width:20px;height:20px;font-size:9px;">U</div>
+                  <div><div style="font-size:13px;font-weight:500;">USDC</div><div style="font-size:11px;color:#73798B;">Arbitrum</div></div>
+                </div>
+              </div>
+            </div>
+            <!-- 右侧地址 -->
+            <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+              <div class="addr-readonly" id="addrDisplay" data-i18n-placeholder="addrPlaceholder">选择代币和网络后自动填充充值地址</div>
+              <div class="addr-tag" data-i18n="feeStationAddr">Fee Station 充值地址</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 您将发送 -->
+      <div class="field">
+        <div class="send-block disabled" id="sendBlock">
+          <div class="send-top-row">
+            <span class="send-label" data-i18n="youWillSend">您将发送</span>
+            <div class="avail-row">
+              <span class="avail-text" data-i18n="available">可用：</span>
+              <span class="avail-num" id="availNum">—</span>
+              <button class="max-btn" id="maxBtn" disabled data-i18n="max">最大</button>
+            </div>
+          </div>
+          <input class="amount-big" id="amountInput" type="number" min="0" step="any" placeholder="0.00" disabled>
+          <div class="detail-expand" id="detailExpand" style="display:none;">
+            <div class="detail-col-heads">
+              <span data-i18n="token">代币</span>
+              <span data-i18n="amount">金额</span>
+            </div>
+            <div class="detail-row">
+              <div class="detail-coin" id="detailCoin">—</div>
+              <input class="detail-input" id="detailAmountInput" type="number" min="0" step="any" placeholder="0.00" disabled>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 总计 -->
+      <div class="total-block" id="totalBlock" style="display:none;">
+        <div class="total-title" data-i18n="total">总计</div>
+        <div class="total-row">
+          <span class="total-key" data-i18n="estimatedReceive">预计收款人收到</span>
+          <div class="total-val">
+            <span class="total-amount" id="totalReceive">—</span>
+            <span class="chain-badge" id="totalChainBadge">—</span>
+          </div>
+        </div>
+        <div class="total-row">
+          <span class="total-key">
+            <span data-i18n="fee">手续费</span>
+            <span class="help-icon" id="feeHelp" title="">?</span>
+          </span>
+          <div class="total-val">
+            <span class="fee-amount" id="feeAmount">—</span>
+          </div>
+        </div>
+        <button class="fee-detail-toggle" id="feeDetailToggle"></button>
+        <div class="fee-detail-table" id="feeDetailTable">
+          <div class="fee-detail-head">
+            <span data-i18n="withdrawAmount">出金金额</span>
+            <span data-i18n="fee">手续费</span>
+            <span data-i18n="estimatedArrival">预计到账金额</span>
+          </div>
+          <div class="fee-detail-row">
+            <div class="fee-coin-cell">
+              <div class="token-dot" id="feeDetailDot" style="width:18px;height:18px;font-size:9px;background:#26A17B;">T</div>
+              <div>
+                <div class="fee-num-cell" id="feeDetailOut">—</div>
+                <div style="font-size:10px;color:#B9BCC5;" id="feeDetailToken">—</div>
+              </div>
+            </div>
+            <div class="fee-num-cell" id="feeDetailFee">—</div>
+            <div class="fee-coin-cell">
+              <div class="token-dot" id="feeDetailDot2" style="width:18px;height:18px;font-size:9px;background:#26A17B;">T</div>
+              <div>
+                <div class="fee-num-cell" id="feeDetailIn">—</div>
+                <div style="font-size:10px;color:#B9BCC5;" id="feeDetailToken2">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-tertiary" id="cancelBtn" data-i18n="cancel">取消</button>
+      <button class="btn btn-primary"  id="previewBtn" disabled data-i18n="preview">预览</button>
+    </div>
+  </div>
+
+  <!-- ════ Dialog 2: 预览 ════ -->
+  <div class="dialog" id="dialogPreview" style="display:none;">
+    <div class="dialog-header">
+      <h1 class="dialog-title" data-i18n="previewTitle">充值 Fee Station — 预览</h1>
+      <button class="close-btn" id="closePreview">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="summary-table">
+        <div class="summary-row">
+          <span class="summary-key" data-i18n="sourceAccount">源账户</span>
+          <span class="summary-val" data-i18n="developer">开发者</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key" data-i18n="recipient">收款人</span>
+          <div class="summary-val" style="flex-direction:column;align-items:flex-start;gap:4px;">
+            <span style="font-weight:600;">Fee Station</span>
+            <span id="previewAddr" style="font-size:12px;color:#73798B;word-break:break-all;"></span>
+            <button class="copy-btn" id="copyAddrPreview" style="font-size:12px;font-weight:500;color:#1F32D6;border:none;background:none;cursor:pointer;padding:0;font-family:'Poppins',sans-serif;" data-i18n="copyAddr">复制地址</button>
+          </div>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key" data-i18n="sourceToken">源代币</span>
+          <span class="summary-val" id="previewToken"></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key" data-i18n="recipientReceives">收款人将收到</span>
+          <span class="summary-val mono" id="previewReceive"></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key" data-i18n="fee">手续费</span>
+          <span class="summary-val mono" id="previewFee"></span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-key" data-i18n="remark">备注</span>
+          <span class="summary-val" style="color:#73798B;">—</span>
+        </div>
+      </div>
+      <div class="notice-bar">
+        <span class="notice-icon">⚠</span>
+        <span data-i18n="irreversibleNotice">链上转账不可撤回，提交后请在 Fee Station 查看到账状态。</span>
+      </div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn btn-tertiary" id="backBtn"   data-i18n="back">返回</button>
+      <button class="btn btn-primary"  id="submitBtn" data-i18n="confirmTopup">确认充值</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── i18n ──
+const I18N = {
+  zh: {
+    developer:         '开发者',
+    balance:           '余额',
+    withdraw:          '出金',
+    transfer:          '划转',
+    topupFeeStation:   '充值 Fee Station',
+    sourceAccount:     '源账户',
+    availDisplay:      '可用 677.87 USDT',
+    recipient:         '收款人',
+    selectToken:       '选择代币',
+    addrPlaceholder:   '选择代币和网络后自动填充充值地址',
+    feeStationAddr:    'Fee Station 充值地址',
+    youWillSend:       '您将发送',
+    available:         '可用：',
+    max:               '最大',
+    token:             '代币',
+    amount:            '金额',
+    total:             '总计',
+    estimatedReceive:  '预计收款人收到',
+    fee:               '手续费',
+    feeHelp:           '一价全包：手续费已含 Gas，按出金金额比例收取',
+    detailLabel:       '明细',
+    withdrawAmount:    '出金金额',
+    estimatedArrival:  '预计到账金额',
+    cancel:            '取消',
+    preview:           '预览',
+    previewTitle:      '充值 Fee Station — 预览',
+    sourceToken:       '源代币',
+    recipientReceives: '收款人将收到',
+    remark:            '备注',
+    copyAddr:          '复制地址',
+    irreversibleNotice:'链上转账不可撤回，提交后请在 Fee Station 查看到账状态。',
+    back:              '返回',
+    confirmTopup:      '确认充值',
+    toastSubmit:       '充值请求已提交，请在 Fee Station 查看到账状态',
+    toastCopy:         '地址已复制',
+  },
+  en: {
+    developer:         'Developer',
+    balance:           'Balance',
+    withdraw:          'Withdraw',
+    transfer:          'Transfer',
+    topupFeeStation:   'Top Up Fee Station',
+    sourceAccount:     'Source Account',
+    availDisplay:      'Available 677.87 USDT',
+    recipient:         'Recipient',
+    selectToken:       'Select token',
+    addrPlaceholder:   'Deposit address will be filled automatically after selecting token and network',
+    feeStationAddr:    'Fee Station deposit address',
+    youWillSend:       'You will send',
+    available:         'Available:',
+    max:               'Max',
+    token:             'Token',
+    amount:            'Amount',
+    total:             'Total',
+    estimatedReceive:  'Estimated recipient receives',
+    fee:               'Fee',
+    feeHelp:           'All-inclusive pricing: fee covers Gas, charged as a percentage of the withdrawal amount',
+    detailLabel:       'Details',
+    withdrawAmount:    'Withdrawal amount',
+    estimatedArrival:  'Estimated arrival',
+    cancel:            'Cancel',
+    preview:           'Preview',
+    previewTitle:      'Top Up Fee Station — Preview',
+    sourceToken:       'Source token',
+    recipientReceives: 'Recipient will receive',
+    remark:            'Remark',
+    copyAddr:          'Copy address',
+    irreversibleNotice:'On-chain transfers are irreversible. Please check the arrival status in Fee Station after submission.',
+    back:              'Back',
+    confirmTopup:      'Confirm Top Up',
+    toastSubmit:       'Top-up request submitted. Check Fee Station for arrival status.',
+    toastCopy:         'Address copied',
+  }
+};
+
+let lang = 'zh';
+
+function applyLang() {
+  const t = I18N[lang];
+  // data-i18n 静态元素
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) el.textContent = t[key];
+  });
+  // 地址占位文字
+  const addr = document.getElementById('addrDisplay');
+  if (!selectedAddr) {
+    addr.textContent = t.addrPlaceholder;
+    addr.style.color = '#BCBBC1';
+  }
+  // 可用余额行
+  document.getElementById('availDisplay').textContent = t.availDisplay;
+  // fee help tooltip
+  document.getElementById('feeHelp').title = t.feeHelp;
+  // 明细折叠按钮
+  document.getElementById('feeDetailToggle').textContent =
+    feeDetailOpen ? `${t.detailLabel} ▲` : `${t.detailLabel} ▼`;
+  // 代币选择 placeholder（如果未选）
+  if (!selectedToken) {
+    document.getElementById('coinSelectDisplay').innerHTML =
+      `<span class="placeholder">${t.selectToken}</span>`;
+  }
+  // 可用数字 label
+  document.querySelector('.avail-text').textContent = t.available;
+  // max btn
+  document.getElementById('maxBtn').textContent = t.max;
+}
+
+// ── 语言切换按钮 ──
+document.getElementById('btnZh').onclick = () => {
+  lang = 'zh';
+  document.getElementById('btnZh').classList.add('active');
+  document.getElementById('btnEn').classList.remove('active');
+  applyLang();
+};
+document.getElementById('btnEn').onclick = () => {
+  lang = 'en';
+  document.getElementById('btnEn').classList.add('active');
+  document.getElementById('btnZh').classList.remove('active');
+  applyLang();
+};
+
+// ── 常量 ──
+const AVAILABLE = 677.87;
+const FEE_RATE  = 0.001;
+
+let selectedToken = null;
+let selectedNet   = null;
+let selectedAddr  = null;
+let feeDetailOpen = true;
+
+// ── DOM ──
+const overlay           = document.getElementById('overlay');
+const dialogForm        = document.getElementById('dialogForm');
+const dialogPreview     = document.getElementById('dialogPreview');
+const coinSelect        = document.getElementById('coinSelect');
+const coinDropdown      = document.getElementById('coinDropdown');
+const coinDisplay       = document.getElementById('coinSelectDisplay');
+const addrDisplay       = document.getElementById('addrDisplay');
+const sendBlock         = document.getElementById('sendBlock');
+const amountInput       = document.getElementById('amountInput');
+const detailAmountInput = document.getElementById('detailAmountInput');
+const availNum          = document.getElementById('availNum');
+const maxBtn            = document.getElementById('maxBtn');
+const totalBlock        = document.getElementById('totalBlock');
+const detailExpand      = document.getElementById('detailExpand');
+const previewBtn        = document.getElementById('previewBtn');
+const toast             = document.getElementById('toast');
+
+// ── 打开/关闭 ──
+document.getElementById('openBtn').onclick = () => {
+  overlay.classList.add('active');
+  dialogForm.style.display = '';
+  dialogPreview.style.display = 'none';
+};
+function closeAll() { overlay.classList.remove('active'); resetForm(); }
+document.getElementById('closeForm').onclick    = closeAll;
+document.getElementById('cancelBtn').onclick    = closeAll;
+document.getElementById('closePreview').onclick = closeAll;
+overlay.onclick = e => { if (e.target === overlay) closeAll(); };
+
+// ── 重置 ──
+function resetForm() {
+  selectedToken = selectedNet = selectedAddr = null;
+  coinSelect.classList.remove('open');
+  coinDropdown.classList.remove('open');
+  coinDisplay.innerHTML = `<span class="placeholder">${I18N[lang].selectToken}</span>`;
+  addrDisplay.textContent = I18N[lang].addrPlaceholder;
+  addrDisplay.classList.remove('filled');
+  addrDisplay.style.color = '#BCBBC1';
+  sendBlock.classList.add('disabled');
+  amountInput.disabled = true; amountInput.value = '';
+  detailAmountInput.disabled = true; detailAmountInput.value = '';
+  availNum.textContent = '—';
+  maxBtn.disabled = true;
+  detailExpand.style.display = 'none';
+  totalBlock.style.display = 'none';
+  previewBtn.disabled = true;
+  document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+}
+
+// ── 代币下拉 ──
+coinSelect.onclick = () => {
+  const open = coinDropdown.classList.contains('open');
+  if (open) { coinSelect.classList.remove('open'); coinDropdown.classList.remove('open'); }
+  else       { coinSelect.classList.add('open');    coinDropdown.classList.add('open'); }
+};
+
+coinDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+  item.onclick = () => {
+    selectedToken = item.dataset.token;
+    selectedNet   = item.dataset.net;
+    selectedAddr  = item.dataset.addr;
+    const dotClass = selectedToken === 'USDT' ? 'dot-usdt' : 'dot-usdc';
+    const dotChar  = selectedToken === 'USDT' ? 'T' : 'U';
+
+    coinDisplay.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div class="token-dot ${dotClass}" style="width:20px;height:20px;font-size:9px;">${dotChar}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#1C1C1C;">${selectedToken}</div>
+          <div style="font-size:11px;color:#73798B;">${selectedNet}</div>
+        </div>
+      </div>`;
+
+    addrDisplay.textContent = selectedAddr;
+    addrDisplay.classList.add('filled');
+    addrDisplay.style.color = '#73798B';
+
+    coinDropdown.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('selected'));
+    item.classList.add('selected');
+    coinSelect.classList.remove('open');
+    coinDropdown.classList.remove('open');
+
+    sendBlock.classList.remove('disabled');
+    amountInput.disabled = false;
+    detailAmountInput.disabled = false;
+    availNum.textContent = `${AVAILABLE} ${selectedToken}`;
+    maxBtn.disabled = false;
+    detailExpand.style.display = '';
+
+    document.getElementById('detailCoin').innerHTML = `
+      <div class="token-dot ${dotClass}" style="width:20px;height:20px;font-size:9px;">${dotChar}</div>
+      <div>
+        <div style="font-size:13px;font-weight:500;">${selectedToken}</div>
+        <div class="detail-coin-sub">${selectedNet}</div>
+      </div>`;
+
+    const bg = selectedToken === 'USDT' ? '#26A17B' : '#2775CA';
+    ['feeDetailDot','feeDetailDot2'].forEach(id => {
+      document.getElementById(id).style.background = bg;
+      document.getElementById(id).textContent = dotChar;
+    });
+    document.getElementById('feeDetailToken').textContent  = selectedToken;
+    document.getElementById('feeDetailToken2').textContent = selectedToken;
+
+    amountInput.focus();
+    recalc();
+  };
+});
+
+// ── 金额联动 ──
+amountInput.oninput = () => { detailAmountInput.value = amountInput.value; recalc(); };
+detailAmountInput.oninput = () => { amountInput.value = detailAmountInput.value; recalc(); };
+maxBtn.onclick = () => { amountInput.value = AVAILABLE; detailAmountInput.value = AVAILABLE; recalc(); };
+
+function recalc() {
+  const val = parseFloat(amountInput.value);
+  if (!selectedToken || !selectedNet || !(val > 0) || val > AVAILABLE) {
+    totalBlock.style.display = 'none'; previewBtn.disabled = true; return;
+  }
+  const fee     = parseFloat((val * FEE_RATE).toFixed(6));
+  const receive = parseFloat((val - fee).toFixed(6));
+
+  document.getElementById('totalReceive').textContent    = `${receive} ${selectedToken}`;
+  document.getElementById('totalChainBadge').textContent = selectedNet;
+  document.getElementById('feeAmount').textContent       = `${fee} ${selectedToken}`;
+  document.getElementById('feeDetailOut').textContent    = val;
+  document.getElementById('feeDetailFee').textContent    = fee > 0 ? fee : '—';
+  document.getElementById('feeDetailIn').textContent     = receive;
+
+  totalBlock.style.display = '';
+  previewBtn.disabled = false;
+}
+
+// ── 明细折叠 ──
+document.getElementById('feeDetailToggle').onclick = () => {
+  feeDetailOpen = !feeDetailOpen;
+  document.getElementById('feeDetailTable').style.display = feeDetailOpen ? '' : 'none';
+  document.getElementById('feeDetailToggle').textContent =
+    feeDetailOpen ? `${I18N[lang].detailLabel} ▲` : `${I18N[lang].detailLabel} ▼`;
+};
+
+// ── 预览 ──
+document.getElementById('previewBtn').onclick = () => {
+  const val     = parseFloat(amountInput.value);
+  const fee     = parseFloat((val * FEE_RATE).toFixed(6));
+  const receive = parseFloat((val - fee).toFixed(6));
+  const dotClass = selectedToken === 'USDT' ? 'dot-usdt' : 'dot-usdc';
+  const dotChar  = selectedToken === 'USDT' ? 'T' : 'U';
+
+  document.getElementById('previewAddr').textContent = selectedAddr;
+  document.getElementById('previewToken').innerHTML  =
+    `<div class="token-dot ${dotClass}" style="width:20px;height:20px;font-size:9px;">${dotChar}</div>
+     ${selectedToken} <span class="chain-badge">${selectedNet}</span>`;
+  document.getElementById('previewReceive').innerHTML =
+    `${receive} ${selectedToken} <span class="chain-badge">${selectedNet}</span>`;
+  document.getElementById('previewFee').textContent  = `${fee} ${selectedToken}`;
+
+  dialogForm.style.display = 'none';
+  dialogPreview.style.display = '';
+};
+
+// ── 返回 / 提交 ──
+document.getElementById('backBtn').onclick   = () => { dialogPreview.style.display='none'; dialogForm.style.display=''; };
+document.getElementById('submitBtn').onclick = () => { closeAll(); showToast(I18N[lang].toastSubmit); };
+
+// ── 复制 ──
+function copyText(t) { navigator.clipboard.writeText(t).catch(()=>{}); showToast(I18N[lang].toastCopy); }
+document.getElementById('copyAddrPreview').onclick = () => copyText(document.getElementById('previewAddr').textContent);
+
+// ── 关闭下拉 ──
+document.addEventListener('click', e => {
+  if (!e.target.closest('.custom-select-wrap')) {
+    coinSelect.classList.remove('open');
+    coinDropdown.classList.remove('open');
+  }
+});
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg; toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+// 初始化
+applyLang();
+</script>
+</body>
+</html>
